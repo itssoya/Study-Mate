@@ -15,25 +15,48 @@ export default function RoomPlay() {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selected, setSelected] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [answeredCount, setAnsweredCount] = useState(0);
+  const [totalPlayers, setTotalPlayers] = useState(0);
   const [finished, setFinished] = useState(false);
   const [isHost, setIsHost] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    api.get(`/rooms/${code}`).then(async (res) => {
-      const room = res.data.room;
-      setIsHost(room.hostUserId === user.id);
-      setLeaderboard(room.players);
-      const { data } = await api.get(`/quizzes/${room.quizId}`);
-      setQuiz(data.quiz);
-    });
+    async function loadRoomAndQuiz() {
+      try {
+        const roomRes = await api.get(`/rooms/${code}`);
+        const room = roomRes.data.room;
+        setIsHost(room.hostUserId === user.id);
+        setLeaderboard(room.players);
+        setTotalPlayers(room.players.length);
+
+        const quizRes = await api.get(`/rooms/${code}/quiz`);
+        setQuiz(quizRes.data.quiz);
+      } catch (err) {
+        console.error("Failed to load room/quiz", err);
+        setLoadError("Failed to load the quiz for this room.");
+      }
+    }
+    loadRoomAndQuiz();
 
     if (!socket.connected) socket.connect();
+    socket.emit("join_room", { code, userId: user.id, name: user.name });
 
     socket.on("question_changed", ({ questionIndex }) => {
       setQuestionIndex(questionIndex);
       setSelected(null);
+      setAnsweredCount(0);
     });
-    socket.on("leaderboard_update", ({ players }) => setLeaderboard(players));
+
+    socket.on(
+      "leaderboard_update",
+      ({ players, answeredCount, totalPlayers }) => {
+        setLeaderboard(players);
+        setAnsweredCount(answeredCount);
+        setTotalPlayers(totalPlayers);
+      },
+    );
+
     socket.on("quiz_finished", ({ players }) => {
       setLeaderboard(players);
       setFinished(true);
@@ -46,10 +69,10 @@ export default function RoomPlay() {
     };
   }, [code, user]);
 
-  const currentQuestion = quiz?.questions[questionIndex];
+  const currentQuestion = quiz?.questions?.[questionIndex];
 
   const handleAnswer = (option) => {
-    if (selected !== null) return; // one answer per question
+    if (selected !== null || !currentQuestion || !quiz) return;
     setSelected(option);
     const correct = option === currentQuestion.correctAnswer;
     socket.emit("submit_answer", {
@@ -57,15 +80,25 @@ export default function RoomPlay() {
       userId: user.id,
       questionIndex,
       correct,
+      totalQuestions: quiz.questions.length,
     });
   };
 
-  const handleNext = () => {
-    socket.emit("next_question", {
+  const handleForceNext = () => {
+    if (!quiz) return;
+    socket.emit("force_next_question", {
       code,
       totalQuestions: quiz.questions.length,
     });
   };
+
+  if (loadError) {
+    return (
+      <Layout>
+        <p className="text-error">{loadError}</p>
+      </Layout>
+    );
+  }
 
   if (finished) {
     const sorted = [...leaderboard].sort((a, b) => b.score - a.score);
@@ -100,7 +133,7 @@ export default function RoomPlay() {
     );
   }
 
-  if (!quiz) {
+  if (!quiz || !currentQuestion) {
     return (
       <Layout>
         <p className="text-text-muted">Loading quiz...</p>
@@ -120,32 +153,42 @@ export default function RoomPlay() {
               {currentQuestion.question}
             </h2>
             <div className="space-y-3">
-              {currentQuestion.options.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => handleAnswer(option)}
-                  disabled={selected !== null}
-                  className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
-                    selected === option
-                      ? "border-primary bg-primary-light/10 font-medium"
-                      : "border-primary-light/30 hover:bg-primary-light/5"
-                  } disabled:cursor-not-allowed`}
-                >
-                  {option}
-                </button>
-              ))}
+              {currentQuestion.options.map((option) => {
+                const isSelected = selected === option;
+                return (
+                  <button
+                    key={option}
+                    onClick={() => handleAnswer(option)}
+                    disabled={selected !== null}
+                    className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
+                      isSelected
+                        ? "border-primary bg-primary-light/10 font-medium cursor-default"
+                        : selected !== null
+                          ? "border-primary-light/20 text-text-muted opacity-50 cursor-default"
+                          : "border-primary-light/30 hover:bg-primary-light/5 cursor-pointer"
+                    }`}
+                  >
+                    {option} {isSelected && "✓"}
+                  </button>
+                );
+              })}
             </div>
+
+            <p className="text-text-muted text-sm mt-4 text-center">
+              {selected !== null
+                ? `Answer locked in — ${answeredCount}/${totalPlayers} players have answered.`
+                : "Answer as fast as you can — speed earns bonus points!"}
+            </p>
+
+            {isHost && selected !== null && answeredCount < totalPlayers && (
+              <button
+                onClick={handleForceNext}
+                className="text-xs text-text-muted underline mt-3 mx-auto block"
+              >
+                Force skip (if someone's stuck)
+              </button>
+            )}
           </div>
-          {isHost && (
-            <button
-              onClick={handleNext}
-              className="w-full mt-4 bg-primary text-white py-3 rounded-lg font-medium hover:bg-primary/90"
-            >
-              {questionIndex + 1 >= quiz.questions.length
-                ? "Finish Quiz"
-                : "Next Question"}
-            </button>
-          )}
         </div>
 
         <div className="bg-surface rounded-2xl shadow-sm p-5">

@@ -92,3 +92,21 @@ exports.getRoom = async (req, res) => {
       .json({ message: "Failed to fetch room", error: err.message });
   }
 };
+
+exports.getRoomQuiz = async (req, res) => {
+  try {
+    const room = await QuizRoom.findOne({
+      code: req.params.code.toUpperCase(),
+    });
+    if (!room) return res.status(404).json({ message: "Room not found" });
+
+    const quiz = await Quiz.findById(room.quizId);
+    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
+
+    res.json({ quiz });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Failed to fetch room quiz", error: err.message });
+  }
+};

@@ -18,6 +18,10 @@ export default function RoomLobby() {
     api.get(`/rooms/${code}`).then((res) => setRoom(res.data.room));
 
     socket.connect();
+
+    console.log("joining as user:", user);
+    socket.emit("join_room", { code, userId: user.id, name: user.name });
+
     socket.emit("join_room", { code, userId: user.id, name: user.name });
 
     socket.on("room_update", ({ room }) => setRoom(room));
@@ -28,7 +32,6 @@ export default function RoomLobby() {
       socket.off("room_update");
       socket.off("quiz_started");
       socket.off("room_error");
-      socket.disconnect();
     };
   }, [code, user, navigate]);
 

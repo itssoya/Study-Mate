@@ -7,6 +7,8 @@ const Quiz = require("../models/Quiz");
 const QuizAttempt = require("../models/QuizAttempt");
 const StudyLog = require("../models/StudyLog");
 const TopicMastery = require("../models/topicMastery");
+const { OAuth2Client } = require("google-auth-library");
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -75,6 +77,15 @@ exports.login = async (req, res) => {
     const user = await User.findOne({
       email: lowerCaseEmail,
     });
+
+    if (!user.passwordHash) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "This account uses Google Sign-In. Please log in with Google instead.",
+        });
+    }
 
     if (!user) {
       return res.status(401).json({ message: "Invalid Credentials" });
@@ -178,6 +189,54 @@ exports.deleteAccount = async (req, res) => {
   }
 };
 
+exports.googleAuth = async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: "Google credential is required" });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const email = payload.email.toLowerCase();
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = await User.create({
+        name: payload.name,
+        email,
+        googleId: payload.sub,
+        avatarUrl: payload.picture,
+      });
+    } else if (!user.googleId) {
+      user.googleId = payload.sub;
+      user.avatarUrl = user.avatarUrl || payload.picture;
+      await user.save();
+    }
+
+    res.json({
+      user: { id: user._id, name: user.name, email: user.email },
+      token: generateToken(user._id),
+    });
+  } catch (err) {
+    res
+      .status(401)
+      .json({ message: "Google authentication failed", error: err.message });
+  }
+};
+
 exports.getMe = async (req, res) => {
-  res.json({ user: req.user });
+  res.json({
+    user: {
+      id: req.user._id,
+      name: req.user.name,
+      email: req.user.email,
+      streak: req.user.streak,
+      avatarUrl: req.user.avatarUrl,
+    },
+  });
 };

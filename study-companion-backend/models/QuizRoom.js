@@ -24,6 +24,10 @@ const quizRoomSchema = new mongoose.Schema(
       default: "waiting",
     },
     currentQuestionIndex: { type: Number, default: -1 },
+
+    currentQuestionIndex: { type: Number, default: -1 },
+    questionStartedAt: { type: Date },
+    answeredThisQuestion: [{ type: mongoose.Schema.Types.ObjectId }],
     players: [
       {
         userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

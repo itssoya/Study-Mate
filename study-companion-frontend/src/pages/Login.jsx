@@ -1,6 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+
+let googleScriptLoaded = false;
+let googleScriptLoading = null;
+
+function loadGoogleScript() {
+  if (googleScriptLoaded) return Promise.resolve();
+  if (googleScriptLoading) return googleScriptLoading;
+
+  googleScriptLoading = new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      googleScriptLoaded = true;
+      resolve();
+    };
+    document.body.appendChild(script);
+  });
+
+  return googleScriptLoading;
+}
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -8,13 +30,42 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
+  const googleButtonRef = useRef(null);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    let cancelled = false;
+
+    loadGoogleScript().then(() => {
+      if (cancelled || !googleButtonRef.current || !window.google) return;
+
+      window.google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        callback: async (response) => {
+          try {
+            await googleLogin(response.credential);
+            navigate("/");
+          } catch (_err) {
+            setError("Google sign-in failed. Please try again.");
+          }
+        },
+      });
+
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: "outline",
+        size: "large",
+        width: 320,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [googleLogin, navigate]);
+
   const handleSubmit = async (e) => {
-    //e.preventDefault removes the default HTML behaviour to reload while submitting
     e.preventDefault();
-    //Setting prev error to null
     setError("");
     setLoading(true);
 
@@ -36,15 +87,28 @@ export default function Login() {
         <h1 className="text-2xl font-bold text-text-primary mb-1">
           Welcome back
         </h1>
+
         <p className="text-text-muted mb-6">
           Log in to keep your streak going.
         </p>
 
+        {/* Google Login */}
+        <div ref={googleButtonRef} className="mb-4 flex justify-center" />
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1 h-px bg-primary-light/30" />
+          <span className="text-xs text-text-muted">or</span>
+          <div className="flex-1 h-px bg-primary-light/30" />
+        </div>
+
+        {/* Email + Password Login */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm text-text-primary mb-1">
               Email
             </label>
+
             <input
               type="email"
               value={email}
@@ -58,6 +122,7 @@ export default function Login() {
             <label className="block text-sm text-text-primary mb-1">
               Password
             </label>
+
             <input
               type="password"
               value={password}
@@ -78,6 +143,7 @@ export default function Login() {
           </button>
         </form>
 
+        {/* Signup */}
         <p className="text-sm text-text-muted mt-4 text-center">
           Don't have an account?{" "}
           <Link to="/signup" className="text-primary font-medium">
