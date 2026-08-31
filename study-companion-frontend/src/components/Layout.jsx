@@ -12,7 +12,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 
 const navItems = [
-  { label: "Dashboard", path: "/", icon: LayoutGrid },
+  { label: "Dashboard", path: "/dashboard", icon: LayoutGrid },
   { label: "My Library", path: "/library", icon: BookOpen },
   { label: "Flashcards", path: "/flashcards", icon: Layers },
   { label: "Quizzes", path: "/quizzes", icon: HelpCircle },
@@ -31,8 +31,18 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-background flex">
       <aside className="w-64 bg-surface border-r border-primary-light/20 flex flex-col">
-        <div className="px-6 py-6">
-          <h1 className="font-display text-2xl text-primary">StudyMate</h1>
+        <div className="px-6 py-5">
+          <Link to="/" className="flex items-center gap-3">
+            <div className="w-12 h-12 flex items-center justify-center shrink-0">
+              <img
+                src="/Logo.gif"
+                alt="StudyMate"
+                className="w-full h-full object-contain"
+              />
+            </div>
+
+            <span className="font-display text-xl text-primary">StudyMate</span>
+          </Link>
         </div>
         <nav className="flex-1 px-3 space-y-1">
           {navItems.map(({ label, path, icon: Icon }) => {

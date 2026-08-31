@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import NotFound from "./pages/NotFound";
 
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -14,6 +15,7 @@ import Settings from "./pages/Settings";
 import CreateRoom from "./pages/createRoom";
 import RoomLobby from "./pages/roomLobby";
 import RoomPlay from "./pages/RoomPlay";
+import Landing from "./pages/LandingPage";
 
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
@@ -23,11 +25,11 @@ function ProtectedRoute({ children }) {
 function AppRoutes() {
   return (
     <Routes>
+      <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
-
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <Dashboard />
@@ -121,6 +123,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

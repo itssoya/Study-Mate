@@ -2,7 +2,6 @@ const QuizRoom = require("../models/QuizRoom");
 
 module.exports = function (io) {
   io.on("connection", (socket) => {
-    // JOIN a room
     socket.on("join_room", async ({ code, userId, name }) => {
       try {
         const upperCode = code.toUpperCase();
@@ -28,19 +27,34 @@ module.exports = function (io) {
       }
     });
 
-    // HOST starts the quiz
+    // NEW — emoji reactions, broadcast instantly to everyone in the room
+    socket.on("send_reaction", ({ code, emoji }) => {
+      io.to(code.toUpperCase()).emit("reaction_received", {
+        emoji,
+        ts: Date.now(),
+      });
+    });
+
+    // UPDATED — countdown before the quiz actually begins
     socket.on("start_quiz", async ({ code }) => {
       const upperCode = code.toUpperCase();
       const room = await QuizRoom.findOne({ code: upperCode });
       if (!room) return;
 
-      room.status = "in_progress";
-      room.currentQuestionIndex = 0;
-      room.answeredThisQuestion = [];
-      room.questionStartedAt = new Date();
-      await room.save();
+      io.to(upperCode).emit("countdown_start");
 
-      io.to(upperCode).emit("quiz_started", { questionIndex: 0 });
+      setTimeout(async () => {
+        const freshRoom = await QuizRoom.findOne({ code: upperCode });
+        if (!freshRoom) return;
+
+        freshRoom.status = "in_progress";
+        freshRoom.currentQuestionIndex = 0;
+        freshRoom.answeredThisQuestion = [];
+        freshRoom.questionStartedAt = new Date();
+        await freshRoom.save();
+
+        io.to(upperCode).emit("quiz_started", { questionIndex: 0 });
+      }, 3000);
     });
 
     socket.on(
@@ -48,18 +62,18 @@ module.exports = function (io) {
       async ({ code, userId, questionIndex, correct, totalQuestions }) => {
         const upperCode = code.toUpperCase();
         const room = await QuizRoom.findOne({ code: upperCode });
-        if (!room || room.currentQuestionIndex !== questionIndex) return; // stale/late answer, ignore
+        if (!room || room.currentQuestionIndex !== questionIndex) return;
 
         const alreadyAnswered = room.answeredThisQuestion.some(
           (id) => id.toString() === userId,
         );
-        if (alreadyAnswered) return; // one answer per player per question, ignore duplicates
+        if (alreadyAnswered) return;
 
         if (correct) {
           const elapsedSeconds = room.questionStartedAt
             ? (Date.now() - room.questionStartedAt.getTime()) / 1000
             : 0;
-          const points = Math.max(50, 100 - Math.floor(elapsedSeconds * 5)); // faster = more points, floor of 50
+          const points = Math.max(50, 100 - Math.floor(elapsedSeconds * 5));
           const player = room.players.find(
             (p) => p.userId.toString() === userId,
           );
@@ -75,7 +89,6 @@ module.exports = function (io) {
           totalPlayers: room.players.length,
         });
 
-        // auto-advance once EVERY player has answered — no one waits on a host click
         if (room.answeredThisQuestion.length >= room.players.length) {
           const nextIndex = room.currentQuestionIndex + 1;
           if (nextIndex >= totalQuestions) {
@@ -95,8 +108,6 @@ module.exports = function (io) {
       },
     );
 
-    // kept as a host-only safety net — NOT the primary flow anymore.
-    // Only useful if a player disconnects mid-question and the room would otherwise wait forever.
     socket.on("force_next_question", async ({ code, totalQuestions }) => {
       const upperCode = code.toUpperCase();
       const room = await QuizRoom.findOne({ code: upperCode });
@@ -116,9 +127,6 @@ module.exports = function (io) {
       }
     });
 
-    socket.on("disconnect", () => {
-      // players stay in the room's player list even on disconnect —
-      // simplest behavior for a portfolio project; real presence tracking is a bigger feature
-    });
+    socket.on("disconnect", () => {});
   });
 };

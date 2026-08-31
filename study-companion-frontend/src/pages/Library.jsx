@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock, Eye, EyeOff, FileText, Plus } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  File,
+  Presentation,
+  FolderOpen,
+  EyeOff,
+} from "lucide-react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 
@@ -37,7 +44,6 @@ export default function Library() {
     setError("");
     setUploading(true);
     setLastUpload(null);
-
     const formData = new FormData();
     formData.append("file", file);
 
@@ -68,9 +74,7 @@ export default function Library() {
     if (dragCounter.current === 0) setDragActive(false);
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
+  const handleDragOver = (e) => e.preventDefault();
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -82,6 +86,13 @@ export default function Library() {
 
   return (
     <Layout>
+      <button
+        onClick={() => navigate("/dashboard")}
+        className="inline-flex items-center gap-2 border border-primary-light/40 rounded-full px-4 py-2 text-sm font-medium text-text-primary hover:bg-primary-light/10 mb-8"
+      >
+        <ArrowLeft size={16} /> Back
+      </button>
+
       <h1 className="font-display text-4xl text-text-primary mb-1">
         Upload Material
       </h1>
@@ -92,16 +103,16 @@ export default function Library() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
         <div
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          onClick={() => !uploading && fileInputRef.current?.click()}
           className={`md:col-span-2 border-2 border-dashed rounded-2xl p-12 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${
             dragActive
               ? "border-primary bg-primary-light/10"
               : "border-primary-light/40 bg-surface"
           }`}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
         >
           <input
             ref={fileInputRef}
@@ -112,9 +123,35 @@ export default function Library() {
               e.target.files?.[0] && handleUpload(e.target.files[0])
             }
           />
-          <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center mb-4">
-            <Lock className="text-white" size={22} />
+
+          {/* stacked file-type icons */}
+          <div className="relative w-40 h-24 mb-5">
+            <div
+              className="absolute left-0 top-2 w-16 h-20 bg-background rounded-lg shadow-md flex flex-col items-center justify-center gap-1 border border-primary-light/30"
+              style={{ transform: "rotate(-10deg)" }}
+            >
+              <File className="text-primary" size={20} />
+              <span className="text-[10px] font-semibold text-text-muted">
+                DOCX
+              </span>
+            </div>
+            <div className="absolute left-1/2 -translate-x-1/2 top-0 w-16 h-20 bg-background rounded-lg shadow-lg flex flex-col items-center justify-center gap-1 border border-primary-light/40 z-10">
+              <FileText className="text-error" size={20} />
+              <span className="text-[10px] font-semibold text-text-muted">
+                PDF
+              </span>
+            </div>
+            <div
+              className="absolute right-0 top-2 w-16 h-20 bg-background rounded-lg shadow-md flex flex-col items-center justify-center gap-1 border border-primary-light/30"
+              style={{ transform: "rotate(10deg)" }}
+            >
+              <Presentation className="text-accent" size={20} />
+              <span className="text-[10px] font-semibold text-text-muted">
+                PPTX
+              </span>
+            </div>
           </div>
+
           {uploading ? (
             <>
               <p className="font-medium text-text-primary">
@@ -178,9 +215,13 @@ export default function Library() {
         </div>
       </div>
 
-      <h2 className="font-display text-2xl text-text-primary mb-4">
-        Recent Uploads
-      </h2>
+      <div className="flex items-center gap-2 mb-4">
+        <FolderOpen className="text-text-muted" size={18} />
+        <h2 className="font-display text-xl text-text-primary">
+          Recent Uploads
+        </h2>
+      </div>
+
       {loading ? (
         <p className="text-text-muted">Loading...</p>
       ) : documents.length === 0 ? (
@@ -216,13 +257,6 @@ export default function Library() {
               </div>
             </div>
           ))}
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-primary-light/40 rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer hover:border-primary/50 transition-colors"
-          >
-            <Plus className="text-text-muted mb-1" size={20} />
-            <span className="text-text-muted text-sm">Upload more</span>
-          </div>
         </div>
       )}
     </Layout>

@@ -5,6 +5,7 @@ import api from "../api/axios";
 import socket from "../socket";
 import { useAuth } from "../context/AuthContext";
 import Layout from "../components/Layout";
+import { getAvatarEmoji } from "../utils/avatar";
 
 export default function RoomPlay() {
   const { code } = useParams();
@@ -20,6 +21,7 @@ export default function RoomPlay() {
   const [finished, setFinished] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [scorePopup, setScorePopup] = useState(null);
 
   useEffect(() => {
     async function loadRoomAndQuiz() {
@@ -75,6 +77,10 @@ export default function RoomPlay() {
     if (selected !== null || !currentQuestion || !quiz) return;
     setSelected(option);
     const correct = option === currentQuestion.correctAnswer;
+    if (correct) {
+      setScorePopup(true);
+      setTimeout(() => setScorePopup(null), 1200);
+    }
     socket.emit("submit_answer", {
       code,
       userId: user.id,
@@ -148,7 +154,16 @@ export default function RoomPlay() {
           <p className="text-text-muted text-sm mb-2">
             Question {questionIndex + 1} of {quiz.questions.length}
           </p>
-          <div className="bg-surface rounded-2xl shadow-sm p-8">
+          <div className="bg-surface rounded-2xl shadow-sm p-8 relative">
+            {scorePopup && (
+              <span
+                className="absolute right-6 top-6 text-success font-display text-2xl"
+                style={{ animation: "pop-score 1.2s ease-out forwards" }}
+              >
+                +points!
+              </span>
+            )}
+
             <h2 className="font-display text-xl text-text-primary mb-6">
               {currentQuestion.question}
             </h2>
@@ -203,7 +218,9 @@ export default function RoomPlay() {
                   key={p.userId}
                   className="flex items-center justify-between text-sm"
                 >
-                  <span className="text-text-primary">{p.name}</span>
+                  <span className="text-text-primary flex items-center gap-2">
+                    <span>{getAvatarEmoji(p.userId)}</span> {p.name}
+                  </span>
                   <span className="text-primary font-medium">{p.score}</span>
                 </div>
               ))}
