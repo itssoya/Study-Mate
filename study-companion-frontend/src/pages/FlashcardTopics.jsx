@@ -9,6 +9,14 @@ export default function FlashcardTopics() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    api
+      .get("/flashcards/topics")
+      .then((res) => setTopics(res.data.topics))
+      .catch((err) => console.error("Failed to load topics", err))
+      .finally(() => setLoading(false));
+  }, []);
+
   const handleDelete = async (e, topic) => {
     e.stopPropagation();
     if (
@@ -24,14 +32,6 @@ export default function FlashcardTopics() {
       console.error("Failed to delete flashcards", err);
     }
   };
-
-  useEffect(() => {
-    api
-      .get("/flashcards/topics")
-      .then((res) => setTopics(res.data.topics))
-      .catch((err) => console.error("Failed to load topics", err))
-      .finally(() => setLoading(false));
-  }, []);
 
   return (
     <Layout>
@@ -57,12 +57,12 @@ export default function FlashcardTopics() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {topics.map(({ topic, cardCount }) => (
-            <button
+            <div
               key={topic}
               onClick={() =>
                 navigate(`/flashcards/topic/${encodeURIComponent(topic)}`)
               }
-              className="bg-surface rounded-2xl p-6 text-left shadow-sm hover:shadow-md transition-shadow flex items-center justify-between relative group"
+              className="bg-surface rounded-2xl p-6 text-left shadow-sm hover:shadow-md transition-shadow flex items-center justify-between relative group cursor-pointer"
             >
               <div>
                 <p className="font-medium text-text-primary">{topic}</p>
@@ -79,7 +79,7 @@ export default function FlashcardTopics() {
                 </button>
                 <ChevronRight className="text-text-muted" size={20} />
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}

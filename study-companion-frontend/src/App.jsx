@@ -16,6 +16,8 @@ import CreateRoom from "./pages/createRoom";
 import RoomLobby from "./pages/roomLobby";
 import RoomPlay from "./pages/RoomPlay";
 import Landing from "./pages/LandingPage";
+import { ThemeProvider } from "./context/ThemeContext";
+import DocumentDetail from "./pages/DocumentDetail";
 
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
@@ -123,6 +125,15 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/library/:id"
+        element={
+          <ProtectedRoute>
+            <DocumentDetail />
+          </ProtectedRoute>
+        }
+      />
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -131,9 +142,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

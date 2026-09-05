@@ -110,3 +110,66 @@ exports.getRoomQuiz = async (req, res) => {
       .json({ message: "Failed to fetch room quiz", error: err.message });
   }
 };
+
+exports.createRoomFromDocument = async (req, res) => {
+  try {
+    const { documentId } = req.body;
+    if (!documentId) {
+      return res.status(400).json({ message: "documentId is required" });
+    }
+
+    const document = await Document.findOne({
+      _id: documentId,
+      userId: req.user._id,
+    });
+    if (!document) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+
+    // Reuse the most recent existing quiz for this document instead of generating a new one
+    let quiz = await Quiz.findOne({
+      documentId: document._id,
+      userId: req.user._id,
+    }).sort({ createdAt: -1 });
+
+    if (!quiz) {
+      // Fallback only — shouldn't normally happen, since every upload generates a quiz automatically
+      if (!document.rawText) {
+        return res
+          .status(400)
+          .json({
+            message: "This document has no extracted text to build a room from",
+          });
+      }
+      const topics = document.topics?.length
+        ? document.topics
+        : [document.subject || "General"];
+      const { questions } = await aiService.generateQuiz(
+        document.rawText,
+        topics,
+      );
+      quiz = await Quiz.create({
+        documentId: document._id,
+        userId: req.user._id,
+        topic: document.subject || "General",
+        questions,
+      });
+    }
+
+    const code = await generateUniqueRoomCode();
+
+    const room = await QuizRoom.create({
+      code,
+      hostUserId: req.user._id,
+      documentId: document._id,
+      quizId: quiz._id,
+      players: [{ userId: req.user._id, name: req.user.name, score: 0 }],
+    });
+
+    res.status(201).json({ room });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Failed to create quiz room", error: err.message });
+  }
+};

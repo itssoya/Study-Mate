@@ -18,8 +18,9 @@ async function extractText(filePath, fileType) {
     }
 
     case "pptx": {
-      const result = await officeParser.parseOffice(filePath);
-      return result.to("text");
+      const ast = await officeParser.parseOffice(filePath);
+      const result = await ast.to("text");
+      return result.value; // pull the string out — this line is likely missing or wrong right now
     }
     default:
       throw new Error(`Unsupported file type: ${fileType}`);

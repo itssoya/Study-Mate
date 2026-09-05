@@ -1,12 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, KeyRound, LogOut, Trash2, AlertTriangle } from "lucide-react";
+import {
+  User,
+  KeyRound,
+  LogOut,
+  Trash2,
+  AlertTriangle,
+  Palette,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import Layout from "../components/Layout";
 
 export default function Settings() {
   const { user, updateProfile, changePassword, deleteAccount, logout } =
     useAuth();
+  const { theme, setTheme, THEMES } = useTheme();
   const navigate = useNavigate();
 
   const [name, setName] = useState(user?.name || "");
@@ -125,6 +134,35 @@ export default function Settings() {
               {profileSaving ? "Saving..." : "Save Changes"}
             </button>
           </form>
+        </div>
+
+        {/* Theme */}
+        <div className="bg-surface rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Palette className="text-primary" size={18} />
+            <h2 className="font-display text-xl text-text-primary">Theme</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {THEMES.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTheme(t.id)}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${
+                  theme === t.id
+                    ? "border-primary"
+                    : "border-transparent hover:border-primary-light/30"
+                }`}
+              >
+                <div
+                  className="w-10 h-10 rounded-full"
+                  style={{ backgroundColor: t.swatch }}
+                />
+                <span className="text-sm font-medium text-text-primary">
+                  {t.label}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Password */}

@@ -7,9 +7,11 @@ import {
   Presentation,
   FolderOpen,
   EyeOff,
+  Sparkles,
 } from "lucide-react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import ErrorDialog from "../components/ErrorDialog";
 
 const FILE_ICON_COLORS = {
   pdf: "bg-error/10 text-error",
@@ -23,7 +25,9 @@ export default function Library() {
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [lastUpload, setLastUpload] = useState(null);
-  const [error, setError] = useState("");
+  const [uploadError, setUploadError] = useState(null);
+  const [lastFile, setLastFile] = useState(null);
+  const [generatingQuizFor, setGeneratingQuizFor] = useState(null);
   const fileInputRef = useRef(null);
   const dragCounter = useRef(0);
   const navigate = useNavigate();
@@ -41,9 +45,10 @@ export default function Library() {
   }, []);
 
   const handleUpload = async (file) => {
-    setError("");
+    setUploadError(null);
     setUploading(true);
     setLastUpload(null);
+    setLastFile(file);
     const formData = new FormData();
     formData.append("file", file);
 
@@ -54,11 +59,37 @@ export default function Library() {
       setLastUpload(data.document);
       loadDocuments();
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Upload failed. Please try again.",
-      );
+      setUploadError({
+        message:
+          err.response?.data?.message || "Upload failed. Please try again.",
+        retryable: err.response?.data?.retryable || false,
+      });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    setUploadError(null);
+    if (lastFile) handleUpload(lastFile);
+  };
+
+  const handleGenerateQuiz = async (e, docId) => {
+    e.stopPropagation();
+    setGeneratingQuizFor(docId);
+    try {
+      const { data } = await api.post(`/documents/${docId}/quiz`);
+      navigate(`/quiz/${data.quiz._id}`);
+    } catch (err) {
+      console.error("Failed to generate quiz", err);
+      setUploadError({
+        message:
+          err.response?.data?.message ||
+          "Failed to generate quiz. Please try again.",
+        retryable: err.response?.data?.retryable || false,
+      });
+    } finally {
+      setGeneratingQuizFor(null);
     }
   };
 
@@ -86,6 +117,14 @@ export default function Library() {
 
   return (
     <Layout>
+      <ErrorDialog
+        open={!!uploadError}
+        onClose={() => setUploadError(null)}
+        onRetry={handleRetry}
+        retryable={uploadError?.retryable}
+        message={uploadError?.message}
+      />
+
       <button
         onClick={() => navigate("/dashboard")}
         className="inline-flex items-center gap-2 border border-primary-light/40 rounded-full px-4 py-2 text-sm font-medium text-text-primary hover:bg-primary-light/10 mb-8"
@@ -124,7 +163,6 @@ export default function Library() {
             }
           />
 
-          {/* stacked file-type icons */}
           <div className="relative w-40 h-24 mb-5">
             <div
               className="absolute left-0 top-2 w-16 h-20 bg-background rounded-lg shadow-md flex flex-col items-center justify-center gap-1 border border-primary-light/30"
@@ -176,7 +214,6 @@ export default function Library() {
             <span>DOCX</span>
             <span>PPTX</span>
           </div>
-          {error && <p className="text-error text-sm mt-4">{error}</p>}
         </div>
 
         <div className="bg-surface rounded-2xl p-6">
@@ -247,13 +284,23 @@ export default function Library() {
               <p className="text-text-muted text-xs mt-0.5">
                 {doc.topics?.length || 0} topics
               </p>
-              <div className="flex items-center gap-1.5 mt-3">
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${doc.status === "ready" ? "bg-success" : "bg-warning"}`}
-                />
-                <span className="text-xs text-text-muted capitalize">
-                  {doc.status === "ready" ? "Ready to study" : doc.status}
-                </span>
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${doc.status === "ready" ? "bg-success" : "bg-warning"}`}
+                  />
+                  <span className="text-xs text-text-muted capitalize">
+                    {doc.status === "ready" ? "Ready to study" : doc.status}
+                  </span>
+                </div>
+                <button
+                  onClick={(e) => handleGenerateQuiz(e, doc._id)}
+                  disabled={generatingQuizFor === doc._id}
+                  className="flex items-center gap-1 text-xs text-primary font-medium hover:underline disabled:opacity-50"
+                >
+                  <Sparkles size={12} />
+                  {generatingQuizFor === doc._id ? "Generating..." : "New Quiz"}
+                </button>
               </div>
             </div>
           ))}

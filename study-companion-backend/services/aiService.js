@@ -2,21 +2,20 @@ const { GoogleGenerativeAI, SchemaType } = require("@google/generative-ai");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// 1. Updated helper function to accept a schema
-async function generateAnswer(prompt, schema) {
+async function generateAnswer(prompt, schema, maxOutputTokens = 2048) {
   const model = genAI.getGenerativeModel({
     model: "gemini-3.6-flash",
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: schema,
+      maxOutputTokens, // add this
     },
   });
 
   const result = await model.generateContent(prompt);
   return JSON.parse(result.response.text());
 }
-
-// 2. Detect Subject & Topics
+// Detect Subject & Topics (kept — still used by roomController.js)
 exports.detectSubjectAndTopics = async (text) => {
   const schema = {
     type: SchemaType.OBJECT,
@@ -41,7 +40,7 @@ ${text.slice(0, 8000)}`;
   return generateAnswer(prompt, schema);
 };
 
-// 3. Generate Flashcards
+// Generate Flashcards — unused since flashcards now only come from mistakes, kept for reference
 exports.generateFlashcards = async (text, topics) => {
   const schema = {
     type: SchemaType.OBJECT,
@@ -69,7 +68,7 @@ ${text.slice(0, 8000)}`;
   return generateAnswer(prompt, schema);
 };
 
-// 4. Generate Quiz
+// Generate Quiz (kept — still used by roomController.js)
 exports.generateQuiz = async (text, topics) => {
   const schema = {
     type: SchemaType.OBJECT,
@@ -99,6 +98,52 @@ exports.generateQuiz = async (text, topics) => {
   };
 
   const prompt = `Create 5 multiple-choice questions from this study material, covering these topics: ${topics.join(", ")}.
+Material:
+${text.slice(0, 8000)}`;
+
+  return generateAnswer(prompt, schema);
+};
+
+// NEW — merged subject/topic detection + quiz generation in a single AI call,
+// used by the main document upload flow to cut round-trip latency in half
+exports.generateDocumentAnalysis = async (text) => {
+  const schema = {
+    type: SchemaType.OBJECT,
+    properties: {
+      subject: {
+        type: SchemaType.STRING,
+        description: "The main subject of the material",
+      },
+      topics: {
+        type: SchemaType.ARRAY,
+        items: { type: SchemaType.STRING },
+        description: "3-6 topic groups",
+      },
+      questions: {
+        type: SchemaType.ARRAY,
+        items: {
+          type: SchemaType.OBJECT,
+          properties: {
+            question: { type: SchemaType.STRING },
+            options: {
+              type: SchemaType.ARRAY,
+              items: { type: SchemaType.STRING },
+              description: "Exactly 4 multiple choice options (A, B, C, D)",
+            },
+            correctAnswer: {
+              type: SchemaType.STRING,
+              description: "The exact text of the correct option",
+            },
+            topic: { type: SchemaType.STRING },
+          },
+          required: ["question", "options", "correctAnswer", "topic"],
+        },
+      },
+    },
+    required: ["subject", "topics", "questions"],
+  };
+
+  const prompt = `Analyze this study material. Identify the subject and 3-6 topic groups, then create exactly 5 multiple-choice questions covering those topics.
 Material:
 ${text.slice(0, 8000)}`;
 
